@@ -1,0 +1,19 @@
+{
+  "name": "\u5403\u4e00\u70b9 \u00b7 \u8f7b\u8bb0\u5f55",
+  "short_name": "\u5403\u4e00\u70b9",
+  "description": "\u996e\u98df\u3001\u559d\u6c34\u548c\u4f53\u91cd\u7684\u8f7b\u91cf\u8bb0\u5f55\u5de5\u5177",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#f7fbfd",
+  "theme_color": "#eef9ff",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "./app-icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
