@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
+  <defs>
+    <linearGradient id="bg" x1="180" y1="80" x2="840" y2="940" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#EAF9FF"/>
+      <stop offset="1" stop-color="#A9E5F8"/>
+    </linearGradient>
+    <linearGradient id="water" x1="320" y1="420" x2="704" y2="760" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#AEEBFF"/>
+      <stop offset="1" stop-color="#45B5E3"/>
+    </linearGradient>
+  </defs>
+  <rect width="1024" height="1024" rx="232" fill="url(#bg)"/>
+  <path d="M512 188c93 0 146 73 146 166 0 69 39 116 82 178 91 132 14 286-132 304-56 7-136 7-192 0-146-18-223-172-132-304 43-62 82-109 82-178 0-93 53-166 146-166Z" fill="rgba(255,255,255,.52)" stroke="white" stroke-width="22"/>
+  <path d="M291 573c84-34 358-35 442 0 62 128-4 241-125 263-56 7-136 7-192 0-121-22-187-135-125-263Z" fill="url(#water)"/>
+  <ellipse cx="512" cy="574" rx="204" ry="34" fill="none" stroke="white" stroke-width="22" opacity=".78"/>
+  <circle cx="512" cy="790" r="88" fill="white"/>
+  <path d="M512 742v96M464 790h96" stroke="#42AEE0" stroke-width="36" stroke-linecap="round"/>
+</svg>
