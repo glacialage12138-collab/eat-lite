@@ -1,0 +1,202 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>吃一点 · 轻记录</title>
+    <meta name="theme-color" content="#eef9ff" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <meta name="apple-mobile-web-app-title" content="吃一点" />
+    <link rel="manifest" href="./manifest.webmanifest" />
+    <link rel="apple-touch-icon" href="./app-icon.svg" />
+    <link rel="icon" href="./app-icon.svg" />
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <main class="phone-shell">
+      <section class="screen">
+        <header class="statusbar">
+          <span class="time-badge">15:35</span>
+          <div class="signals">
+            <span class="bars" aria-hidden="true"></span>
+            <span>5G</span>
+            <span class="battery">66</span>
+          </div>
+        </header>
+
+        <section class="page page-today active" data-page="today">
+          <div class="title-row">
+            <h1>今天</h1>
+          </div>
+
+          <nav class="date-strip" id="dateStrip" aria-label="日期选择"></nav>
+
+          <section class="calorie-panel">
+            <div class="calorie-line">
+              <div><strong id="todayKcal">175</strong><span>kcal</span></div>
+              <button id="targetKcal" type="button">2450 kcal</button>
+            </div>
+            <div class="soft-progress"><span id="kcalProgress"></span></div>
+            <div class="activity-tabs" role="group" aria-label="活动强度">
+              <button type="button" data-activity="sedentary"><span>久坐</span><small id="sedentaryKcal">--</small></button>
+              <button type="button" data-activity="light"><span>轻活动</span><small id="lightKcal">--</small></button>
+              <button type="button" data-activity="moderate"><span>中等活动</span><small id="moderateKcal">--</small></button>
+              <button class="active" type="button" data-activity="high"><span>高活动</span><small id="highKcal">--</small></button>
+            </div>
+          </section>
+
+          <section class="weight-card">
+            <div class="weight-main">
+              <strong id="weightValue">83.70</strong><span> kg</span>
+              <p id="bmiValue">BMI: 28.6 ›</p>
+            </div>
+            <div class="weight-trend" aria-label="体重趋势图">
+              <svg id="weightChart" viewBox="0 0 132 58" role="img" aria-label="最近体重曲线">
+                <path class="chart-area" d="M4 44 C24 36 33 42 48 34 S78 24 96 30 S118 36 128 20 L128 58 L4 58 Z"></path>
+                <path class="chart-line" d="M4 44 C24 36 33 42 48 34 S78 24 96 30 S118 36 128 20"></path>
+                <circle class="chart-dot" cx="128" cy="20" r="4"></circle>
+              </svg>
+              <span id="weightDelta">近7天 -0.4kg</span>
+            </div>
+            <button id="openWeightDialog" type="button" aria-label="设置体重">+</button>
+          </section>
+
+          <section class="day-log">
+            <span class="dot"></span>
+            <div>
+              <h2>今天 <small>15:34</small></h2>
+              <p id="logText">吊龙烤肉肩<br />测试用<br />吊龙猪肉铺</p>
+            </div>
+            <figure class="log-thumb">
+              <img id="foodPreview" alt="识别出的食物主体预览" />
+              <figcaption><b id="thumbKcal">175</b> kcal</figcaption>
+            </figure>
+          </section>
+        </section>
+
+        <section class="page page-water" data-page="water">
+          <section class="water-hero">
+            <button class="minus" id="removeWater" type="button" aria-label="减少本次水量">−</button>
+            <div class="water-person">
+              <span class="water-fill" id="waterFill"></span>
+            </div>
+            <button id="addWater" class="water-plus" type="button" aria-label="记录喝水">+</button>
+            <div class="water-ruler" aria-label="今日饮水量刻度">
+              <span>2000ml</span>
+              <div class="ruler-ticks" id="rulerTicks" aria-hidden="true"></div>
+              <b id="waterNow">900ml</b>
+            </div>
+          </section>
+          <div class="water-bottom">
+            <div>
+              <h2>请选择喝水量</h2>
+              <p id="waterAmountHint">约四口水</p>
+            </div>
+            <button class="time-chip" id="openTimeDialog" type="button">现在 15:36⌄</button>
+          </div>
+          <div class="amount-picker" id="amountPicker" role="group" aria-label="喝水量">
+            <button type="button" data-amount="50">50</button>
+            <button class="active" type="button" data-amount="100">100<span>ml</span></button>
+            <button type="button" data-amount="250">250</button>
+            <button type="button" data-amount="500">500</button>
+            <button type="button" data-amount="800">800</button>
+            <button type="button" data-amount="1000">1000</button>
+          </div>
+          <section class="water-summary">
+            <div class="analysis-head">
+              <h2>喝水习惯分析</h2>
+              <div class="period-tabs" role="group" aria-label="喝水分析周期">
+                <button class="active" type="button" data-period="week">周</button>
+                <button type="button" data-period="month">月</button>
+                <button type="button" data-period="year">年</button>
+              </div>
+            </div>
+            <div>
+              <span><b id="waterTotal">900</b> 今日饮水量</span>
+              <span><b id="waterCount">4</b> 今日喝水次数</span>
+              <span><b id="waterAverage">129</b> 平均每日水量</span>
+              <span><b id="waterAverageCount">4</b> 平均每日次数</span>
+            </div>
+            <section class="time-analysis" aria-label="上午下午晚上喝水量">
+              <div>
+                <label>上午</label>
+                <span class="segment-track"><i id="morningBar"></i></span>
+                <b id="morningMl">0ml</b>
+              </div>
+              <div>
+                <label>下午</label>
+                <span class="segment-track"><i id="afternoonBar"></i></span>
+                <b id="afternoonMl">0ml</b>
+              </div>
+              <div>
+                <label>晚上</label>
+                <span class="segment-track"><i id="eveningBar"></i></span>
+                <b id="eveningMl">0ml</b>
+              </div>
+            </section>
+          </section>
+        </section>
+
+        <section class="capture-sheet" id="captureSheet" hidden>
+          <button class="sheet-close" id="closeSheet" type="button" aria-label="关闭">×</button>
+          <div class="sheet-preview">
+            <img id="sheetFood" alt="上传食物预览" />
+            <span><b id="sheetKcal">175</b> kcal</span>
+          </div>
+          <div class="sheet-form">
+            <label for="noteText">备注</label>
+            <textarea id="noteText" rows="4">测试用</textarea>
+            <div class="sheet-bottom">
+              <button class="time-chip" type="button">现在 15:34⌄</button>
+              <button class="confirm-button" id="confirmFood" type="button">✓</button>
+            </div>
+          </div>
+        </section>
+
+        <section class="weight-dialog" id="weightDialog" hidden>
+          <div class="weight-dialog-card">
+            <button class="dialog-close" id="closeWeightDialog" type="button" aria-label="关闭">×</button>
+            <h2>记录体重</h2>
+            <p>更新后会重新计算 BMI 和推荐摄入量。</p>
+            <label for="weightInput">当前体重</label>
+            <div class="weight-input-row">
+              <input id="weightInput" type="number" min="30" max="220" step="0.1" value="83.7" />
+              <span>kg</span>
+            </div>
+            <button class="save-weight" id="saveWeight" type="button">保存</button>
+          </div>
+        </section>
+
+        <section class="time-dialog" id="timeDialog" hidden>
+          <div class="time-dialog-card">
+            <button class="dialog-close" id="closeTimeDialog" type="button" aria-label="关闭">×</button>
+            <h2>选择喝水时间</h2>
+            <div class="wheel-picker" aria-label="喝水时间滚轮">
+              <div class="wheel-column" id="dateWheel" aria-label="日期"></div>
+              <div class="wheel-column" id="hourWheel" aria-label="小时"></div>
+              <div class="wheel-column" id="minuteWheel" aria-label="分钟"></div>
+            </div>
+            <button class="save-time" id="saveTime" type="button">确定</button>
+          </div>
+        </section>
+
+        <input id="foodInput" type="file" accept="image/*" capture="environment" />
+
+        <nav class="bottom-nav" aria-label="底部导航">
+          <button class="active" type="button" data-target="today" aria-label="饮食"><span class="bowl"></span></button>
+          <button type="button" data-target="water" aria-label="喝水"><span class="cup"></span></button>
+          <button class="camera-tab" type="button" aria-label="拍照"><span class="camera-glyph"></span></button>
+        </nav>
+      </section>
+    </main>
+    <script src="./script.js"></script>
+    <script>
+      if ("serviceWorker" in navigator) {
+        window.addEventListener("load", () => {
+          navigator.serviceWorker.register("./sw.js");
+        });
+      }
+    </script>
+  </body>
+</html>
