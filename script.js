@@ -86,6 +86,604 @@ let waterPeriod = "week";
 
 const profile = {
   heightCm: 171,
+  weightKg: null,
+  activity: "high",
+  weights: [],
+};
+
+const activityLevels = {
+  sedentary: { label: "久坐", multiplier: 1.22, deficit: 0.78 },
+  light: { label: "轻活动", multiplier: 1.38, deficit: 0.80 },
+  moderate: { label: "中等活动", multiplier: 1.55, deficit: 0.82 },
+  high: { label: "高活动", multiplier: 1.72, deficit: 0.84 },
+};
+
+const dayPlans = {};
+
+function planForDate(date) {
+  if (!dayPlans[date]) {
+    dayPlans[date] = emptyPlan();
+  }
+  return dayPlans[date];
+}
+
+const foodWords = [
+  ["salad", "沙拉", 180],
+  ["rice", "米饭/盖饭", 360],
+  ["noodle", "面食", 520],
+  ["cake", "甜点", 430],
+  ["pizza", "披萨", 620],
+  ["burger", "汉堡", 680],
+  ["apple", "苹果", 95],
+  ["banana", "香蕉", 120],
+  ["chicken", "鸡肉餐", 460],
+  ["fish", "鱼类餐", 310],
+  ["pork", "猪肉餐", 420],
+  ["beef", "牛肉餐", 480],
+  ["meat", "肉类餐", 520],
+];
+
+const waterHistory = {
+  week: { days: 7, total: 0, count: 0 },
+  month: { days: 30, total: 0, count: 0 },
+  year: { days: 365, total: 0, count: 0 },
+};
+
+function showPage(name) {
+  pages.forEach((page) => page.classList.toggle("active", page.dataset.page === name));
+  navButtons.forEach((button) => button.classList.toggle("active", button.dataset.target === name));
+}
+
+function recommendedKcal(activity = profile.activity) {
+  if (!Number.isFinite(profile.weightKg)) return 0;
+  const level = activityLevels[activity];
+  const bmr = 10 * profile.weightKg + 6.25 * profile.heightCm - 5 * 30 - 161;
+  const target = bmr * level.multiplier * level.deficit;
+  return Math.round(target / 10) * 10;
+}
+
+function updateActivityTargets() {
+  activityButtons.forEach((button) => {
+    const key = button.dataset.activity;
+    const value = recommendedKcal(key);
+    button.querySelector("small").textContent = value ? `${value}` : "--";
+    button.classList.toggle("active", key === profile.activity);
+  });
+  const target = recommendedKcal();
+  targetKcal.textContent = target ? `${target} kcal` : "设置资料";
+}
+
+function updateWeightInfo() {
+  if (!Number.isFinite(profile.weightKg)) {
+    weightValue.textContent = "--";
+    bmiValue.textContent = "BMI: --";
+    weightDelta.textContent = "等待记录";
+    return;
+  }
+  const heightM = profile.heightCm / 100;
+  const bmi = profile.weightKg / (heightM * heightM);
+  weightValue.textContent = profile.weightKg.toFixed(2);
+  bmiValue.textContent = `BMI: ${bmi.toFixed(1)} ›`;
+  if (profile.weights.length < 2) {
+    weightDelta.textContent = "已记录";
+    return;
+  }
+  const first = profile.weights[0];
+  const last = profile.weights[profile.weights.length - 1];
+  const delta = last - first;
+  weightDelta.textContent = `近7天 ${delta >= 0 ? "+" : ""}${delta.toFixed(1)}kg`;
+}
+
+function updateCalories() {
+  const plan = planForDate(currentDate);
+  const target = recommendedKcal();
+  todayKcal.textContent = plan.kcal;
+  thumbKcal.textContent = plan.mealKcal || 0;
+  sheetKcal.textContent = pendingKcal;
+  kcalProgress.style.width = `${target ? Math.min(100, Math.round((plan.kcal / target) * 100)) : 0}%`;
+}
+
+function renderDay() {
+  const plan = planForDate(currentDate);
+  logText.innerHTML = plan.note;
+  logTime.textContent = plan.time || "";
+  updateCalories();
+
+  if (plan.image) {
+    foodPreview.src = plan.image;
+    foodPreview.style.display = "block";
+    foodPreview.closest(".log-thumb").hidden = false;
+  } else {
+    foodPreview.removeAttribute("src");
+    foodPreview.style.display = "none";
+    foodPreview.closest(".log-thumb").hidden = true;
+  }
+}
+
+function selectDate(date, scroll = true) {
+  currentDate = date;
+  dateButtons.forEach((button) => button.classList.toggle("active", button.dataset.date === date));
+  if (scroll) {
+    document.querySelector(`.date-pill[data-date="${date}"]`)?.scrollIntoView({
+      inline: "center",
+      block: "nearest",
+      behavior: "smooth",
+    });
+  }
+  renderDay();
+}
+
+function buildDateStrip() {
+  const weekDays = ["周日", "周一", "周二", "周三", "周四", "周五", "周六"];
+  const base = startOfToday();
+  dateStrip.innerHTML = "";
+  for (let offset = -30; offset <= 30; offset += 1) {
+    const date = new Date(base);
+    date.setDate(base.getDate() + offset);
+    const key = dateKey(date);
+    const button = document.createElement("button");
+    button.className = "date-pill";
+    button.type = "button";
+    button.dataset.date = key;
+    button.innerHTML = `<span>${weekDays[date.getDay()]}</span><strong>${date.getDate()}</strong>`;
+    button.addEventListener("click", () => selectDate(key));
+    dateStrip.appendChild(button);
+  }
+  dateButtons = [...dateStrip.querySelectorAll(".date-pill")];
+}
+
+function estimateFromFile(file) {
+  const name = file.name.toLowerCase();
+  const hit = foodWords.find(([key]) => name.includes(key));
+  if (hit) {
+    pendingFoodLabel = hit[1];
+    return hit[2];
+  }
+  pendingFoodLabel = "拍摄食物";
+  const sizeSignal = Math.min(360, Math.round(file.size / 5200));
+  return Math.max(95, 160 + sizeSignal + Math.round(Math.random() * 90));
+}
+
+function estimateFromImage(file) {
+  return new Promise((resolve) => {
+    const fallback = estimateFromFile(file);
+    const image = new Image();
+    const objectUrl = URL.createObjectURL(file);
+    image.onload = () => {
+      const megapixels = (image.naturalWidth * image.naturalHeight) / 1000000;
+      const densitySignal = Math.min(240, Math.round(file.size / Math.max(9000, megapixels * 9000)));
+      const plateSignal = Math.min(180, Math.round(Math.sqrt(megapixels) * 55));
+      const estimate = Math.round((fallback + densitySignal + plateSignal) / 10) * 10;
+      URL.revokeObjectURL(objectUrl);
+      resolve(Math.max(80, Math.min(980, estimate)));
+    };
+    image.onerror = () => {
+      URL.revokeObjectURL(objectUrl);
+      resolve(fallback);
+    };
+    image.src = objectUrl;
+  });
+}
+
+function fileToDataUrl(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
+async function analyzeFoodWithAI(file) {
+  try {
+    const image = await fileToDataUrl(file);
+    const response = await fetch("./api/analyze-food", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ image }),
+    });
+    if (!response.ok) throw new Error("AI endpoint unavailable");
+    const result = await response.json();
+    if (!Number.isFinite(result.kcal)) throw new Error("AI result missing kcal");
+    pendingFoodLabel = result.food || "拍摄食物";
+    return {
+      kcal: Math.max(20, Math.round(result.kcal)),
+      note: result.note || `${pendingFoodLabel}，AI 估算约 ${Math.round(result.kcal)} kcal`,
+    };
+  } catch {
+    const kcal = await estimateFromImage(file);
+    return {
+      kcal,
+      note: `${pendingFoodLabel}，本地估算约 ${kcal} kcal`,
+    };
+  }
+}
+
+function updateFoodImage(url) {
+  currentImage = url;
+  [foodPreview, sheetFood].forEach((image) => {
+    image.src = url;
+    image.style.display = "block";
+  });
+}
+
+function openCaptureSheet() {
+  captureSheet.hidden = false;
+}
+
+function closeCaptureSheet() {
+  captureSheet.hidden = true;
+}
+
+function updateWater() {
+  waterMl = waterLogs.filter((log) => log.date === "今天").reduce((sum, log) => sum + log.amount, 0);
+  const percent = Math.max(0, Math.min(100, Math.round((waterMl / 2000) * 100)));
+  waterFill.style.height = `${Math.max(12, percent)}%`;
+  document.documentElement.style.setProperty("--water-marker", `${100 - percent}%`);
+  document.documentElement.style.setProperty("--water-marker-top", percent >= 100 ? "15px" : percent <= 0 ? "calc(100% + 12px)" : `${100 - percent}%`);
+  document.documentElement.style.setProperty("--water-marker-shift", percent >= 100 || percent <= 0 ? "0" : "-50%");
+  document.documentElement.style.setProperty("--water-surface", `${326 - (percent / 100) * 210}px`);
+  waterNow.textContent = `${waterMl}ml`;
+  updateRulerTicks(percent);
+  waterTotal.textContent = waterMl;
+  const todayLogs = waterLogs.filter((log) => log.date === "今天");
+  waterCount.textContent = todayLogs.length;
+
+  const period = waterHistory[waterPeriod];
+  const periodTotal = period.total + waterMl;
+  const periodCount = period.count + todayLogs.length;
+  waterAverage.textContent = Math.round(periodTotal / period.days);
+  waterAverageCount.textContent = Math.round(periodCount / period.days);
+  updateWaterSegments(todayLogs);
+}
+
+function buildRulerTicks() {
+  rulerTicks.innerHTML = "";
+  for (let index = 0; index <= 20; index += 1) {
+    const tick = document.createElement("i");
+    if (index % 5 === 0) tick.className = "major";
+    else if (index % 2 === 0) tick.className = "mid";
+    rulerTicks.appendChild(tick);
+  }
+}
+
+function updateRulerTicks(percent) {
+  const ticks = [...rulerTicks.children];
+  const activeCount = Math.round((percent / 100) * (ticks.length - 1));
+  ticks.forEach((tick, index) => {
+    const fromBottom = ticks.length - 1 - index;
+    tick.classList.toggle("active", fromBottom <= activeCount);
+  });
+}
+
+function waterHint(amount) {
+  if (amount <= 50) return "约两口水";
+  if (amount <= 100) return "约1个纸杯";
+  if (amount <= 250) return "约半瓶矿泉水";
+  if (amount <= 500) return "约一瓶矿泉水";
+  if (amount <= 800) return "约两听可乐";
+  return "约两瓶矿泉水";
+}
+
+function selectWaterAmount(button, scroll = true) {
+  amountButtons.forEach((item) => {
+    item.classList.remove("active");
+    item.querySelector("span")?.remove();
+  });
+  button.classList.add("active");
+  selectedWater = Number.parseInt(button.dataset.amount || button.textContent, 10);
+  const unit = document.createElement("span");
+  unit.textContent = "ml";
+  button.appendChild(unit);
+  waterAmountHint.textContent = waterHint(selectedWater);
+  if (scroll) {
+    button.scrollIntoView({ inline: "center", block: "nearest", behavior: "smooth" });
+  }
+}
+
+function formatSelectedWaterTime() {
+  const hour = String(selectedWaterTime.hour).padStart(2, "0");
+  const minute = String(selectedWaterTime.minute).padStart(2, "0");
+  return `${selectedWaterTime.date} ${hour}:${minute}`;
+}
+
+function updateWaterSegments(logs) {
+  const segments = logs.reduce((acc, log) => {
+    if (log.hour < 12) acc.morning += log.amount;
+    else if (log.hour < 18) acc.afternoon += log.amount;
+    else acc.evening += log.amount;
+    return acc;
+  }, { morning: 0, afternoon: 0, evening: 0 });
+  const max = Math.max(segments.morning, segments.afternoon, segments.evening, 1);
+  morningMl.textContent = `${segments.morning}ml`;
+  afternoonMl.textContent = `${segments.afternoon}ml`;
+  eveningMl.textContent = `${segments.evening}ml`;
+  morningBar.style.width = `${Math.round((segments.morning / max) * 100)}%`;
+  afternoonBar.style.width = `${Math.round((segments.afternoon / max) * 100)}%`;
+  eveningBar.style.width = `${Math.round((segments.evening / max) * 100)}%`;
+}
+
+function buildWheel(column, values, current, formatter = (value) => value) {
+  column.innerHTML = "";
+  values.forEach((value) => {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.dataset.value = value;
+    button.textContent = formatter(value);
+    button.classList.toggle("active", String(value) === String(current));
+    button.addEventListener("click", () => {
+      [...column.children].forEach((item) => item.classList.remove("active"));
+      button.classList.add("active");
+      button.scrollIntoView({ block: "center", behavior: "smooth" });
+    });
+    column.appendChild(button);
+  });
+  column.onscroll = () => {
+    window.requestAnimationFrame(() => {
+      const center = column.getBoundingClientRect().top + column.clientHeight / 2;
+      let nearest = null;
+      let nearestDistance = Number.POSITIVE_INFINITY;
+      [...column.children].forEach((button) => {
+        const rect = button.getBoundingClientRect();
+        const distance = Math.abs(rect.top + rect.height / 2 - center);
+        if (distance < nearestDistance) {
+          nearest = button;
+          nearestDistance = distance;
+        }
+      });
+      if (nearest) {
+        [...column.children].forEach((item) => item.classList.toggle("active", item === nearest));
+      }
+    });
+  };
+}
+
+function selectedWheelValue(column) {
+  return column.querySelector(".active")?.dataset.value;
+}
+
+function waterDateOptions() {
+  const result = [];
+  const base = startOfToday();
+  for (let offset = 0; offset < 30; offset += 1) {
+    const date = new Date(base);
+    date.setDate(base.getDate() - offset);
+    if (offset === 0) result.push("今天");
+    else if (offset === 1) result.push("昨天");
+    else result.push(`${date.getMonth() + 1}月${date.getDate()}日`);
+  }
+  return result;
+}
+
+function openWaterTimeWheel() {
+  buildWheel(dateWheel, waterDateOptions(), selectedWaterTime.date);
+  buildWheel(hourWheel, Array.from({ length: 24 }, (_, index) => index), selectedWaterTime.hour, (value) => `${String(value).padStart(2, "0")}时`);
+  buildWheel(minuteWheel, Array.from({ length: 60 }, (_, index) => index), selectedWaterTime.minute, (value) => `${String(value).padStart(2, "0")}分`);
+  timeDialog.hidden = false;
+  [dateWheel, hourWheel, minuteWheel].forEach((column) => {
+    column.querySelector(".active")?.scrollIntoView({ block: "center" });
+  });
+}
+
+navButtons.forEach((button) => {
+  button.addEventListener("click", () => showPage(button.dataset.target));
+});
+
+dateStrip.addEventListener("wheel", (event) => {
+  if (Math.abs(event.deltaY) > Math.abs(event.deltaX)) {
+    dateStrip.scrollLeft += event.deltaY;
+  }
+}, { passive: true });
+
+activityButtons.forEach((button) => {
+  button.addEventListener("click", () => {
+    profile.activity = button.dataset.activity;
+    updateActivityTargets();
+    updateCalories();
+  });
+});
+
+openWeightDialog.addEventListener("click", () => {
+  weightInput.value = Number.isFinite(profile.weightKg) ? profile.weightKg.toFixed(1) : "";
+  weightDialog.hidden = false;
+  weightInput.focus();
+});
+
+closeWeightDialog.addEventListener("click", () => {
+  weightDialog.hidden = true;
+});
+
+saveWeight.addEventListener("click", () => {
+  const nextWeight = Number.parseFloat(weightInput.value);
+  if (!Number.isFinite(nextWeight) || nextWeight < 30 || nextWeight > 220) return;
+  profile.weightKg = nextWeight;
+  profile.weights = [...profile.weights.slice(-6), nextWeight];
+  updateWeightInfo();
+  updateActivityTargets();
+  updateCalories();
+  weightDialog.hidden = true;
+});
+
+cameraButtons.forEach((button) => {
+  button.addEventListener("click", () => foodInput.click());
+});
+
+foodInput.addEventListener("change", async (event) => {
+  const [file] = event.target.files;
+  if (!file) return;
+  const previewUrl = URL.createObjectURL(file);
+  updateFoodImage(previewUrl);
+  noteText.value = "正在识别食物热量...";
+  const result = await analyzeFoodWithAI(file);
+  pendingKcal = result.kcal;
+  updateCalories();
+  noteText.value = result.note;
+  openCaptureSheet();
+  foodInput.value = "";
+});
+
+closeSheet.addEventListener("click", closeCaptureSheet);
+
+confirmFood.addEventListener("click", () => {
+  const plan = planForDate(currentDate);
+  const nowLabel = timeLabel();
+  const note = noteText.value.trim() || `自动估算约 ${pendingKcal} kcal`;
+  plan.kcal += pendingKcal;
+  plan.mealKcal = pendingKcal;
+  plan.image = currentImage;
+  plan.time = nowLabel;
+  plan.note = `${pendingFoodLabel}<br>${note}<br>拍照识别，仅供估算`;
+  renderDay();
+  closeCaptureSheet();
+  showPage("today");
+});
+
+amountButtons.forEach((button) => {
+  button.addEventListener("click", () => {
+    selectWaterAmount(button);
+  });
+});
+
+amountPicker.addEventListener("wheel", (event) => {
+  if (Math.abs(event.deltaY) > Math.abs(event.deltaX)) {
+    amountPicker.scrollLeft += event.deltaY;
+  }
+}, { passive: true });
+
+addWater.addEventListener("click", () => {
+  waterLogs.push({ amount: selectedWater, ...selectedWaterTime });
+  updateWater();
+});
+
+removeWater.addEventListener("click", () => {
+  const index = waterLogs.findLastIndex((log) => log.date === "今天");
+  if (index >= 0) waterLogs.splice(index, 1);
+  updateWater();
+});
+
+openTimeDialog.addEventListener("click", () => {
+  openWaterTimeWheel();
+});
+
+closeTimeDialog.addEventListener("click", () => {
+  timeDialog.hidden = true;
+});
+
+saveTime.addEventListener("click", () => {
+  selectedWaterTime = {
+    date: selectedWheelValue(dateWheel) || "今天",
+    hour: Number.parseInt(selectedWheelValue(hourWheel), 10) || 0,
+    minute: Number.parseInt(selectedWheelValue(minuteWheel), 10) || 0,
+  };
+  openTimeDialog.textContent = `${formatSelectedWaterTime()}⌄`;
+  timeDialog.hidden = true;
+});
+
+periodButtons.forEach((button) => {
+  button.addEventListener("click", () => {
+    waterPeriod = button.dataset.period;
+    periodButtons.forEach((item) => item.classList.toggle("active", item === button));
+    updateWater();
+  });
+});
+
+updateWeightInfo();
+updateActivityTargets();
+buildDateStrip();
+selectDate(currentDate, false);
+document.querySelector(`.date-pill[data-date="${currentDate}"]`)?.scrollIntoView({ inline: "center", block: "nearest" });
+selectWaterAmount(document.querySelector('.amount-picker button[data-amount="100"]'), false);
+openTimeDialog.textContent = `${formatSelectedWaterTime()}⌄`;
+buildRulerTicks();
+updateWater();
+const pages = document.querySelectorAll(".page");
+const navButtons = document.querySelectorAll(".bottom-nav button[data-target]");
+const cameraButtons = document.querySelectorAll(".camera-tab, .log-thumb");
+const dateStrip = document.querySelector("#dateStrip");
+let dateButtons = [];
+const foodInput = document.querySelector("#foodInput");
+const foodPreview = document.querySelector("#foodPreview");
+const sheetFood = document.querySelector("#sheetFood");
+const captureSheet = document.querySelector("#captureSheet");
+const closeSheet = document.querySelector("#closeSheet");
+const confirmFood = document.querySelector("#confirmFood");
+const noteText = document.querySelector("#noteText");
+const todayKcal = document.querySelector("#todayKcal");
+const targetKcal = document.querySelector("#targetKcal");
+const thumbKcal = document.querySelector("#thumbKcal");
+const sheetKcal = document.querySelector("#sheetKcal");
+const kcalProgress = document.querySelector("#kcalProgress");
+const logText = document.querySelector("#logText");
+const logTime = document.querySelector("#logTime") || document.querySelector(".day-log small");
+const activityButtons = document.querySelectorAll(".activity-tabs button");
+const weightValue = document.querySelector("#weightValue");
+const bmiValue = document.querySelector("#bmiValue");
+const weightDelta = document.querySelector("#weightDelta");
+const openWeightDialog = document.querySelector("#openWeightDialog");
+const weightDialog = document.querySelector("#weightDialog");
+const closeWeightDialog = document.querySelector("#closeWeightDialog");
+const weightInput = document.querySelector("#weightInput");
+const saveWeight = document.querySelector("#saveWeight");
+const amountButtons = document.querySelectorAll(".amount-picker button");
+const amountPicker = document.querySelector("#amountPicker");
+const addWater = document.querySelector("#addWater");
+const removeWater = document.querySelector("#removeWater");
+const waterFill = document.querySelector("#waterFill");
+const waterNow = document.querySelector("#waterNow");
+const waterTotal = document.querySelector("#waterTotal");
+const waterCount = document.querySelector("#waterCount");
+const waterAverage = document.querySelector("#waterAverage");
+const waterLast = document.querySelector("#waterLast");
+const waterAmountHint = document.querySelector("#waterAmountHint");
+const openTimeDialog = document.querySelector("#openTimeDialog");
+const timeDialog = document.querySelector("#timeDialog");
+const closeTimeDialog = document.querySelector("#closeTimeDialog");
+const dateWheel = document.querySelector("#dateWheel");
+const hourWheel = document.querySelector("#hourWheel");
+const minuteWheel = document.querySelector("#minuteWheel");
+const saveTime = document.querySelector("#saveTime");
+const periodButtons = document.querySelectorAll(".period-tabs button");
+const waterAverageCount = document.querySelector("#waterAverageCount");
+const morningMl = document.querySelector("#morningMl");
+const afternoonMl = document.querySelector("#afternoonMl");
+const eveningMl = document.querySelector("#eveningMl");
+const morningBar = document.querySelector("#morningBar");
+const afternoonBar = document.querySelector("#afternoonBar");
+const eveningBar = document.querySelector("#eveningBar");
+const rulerTicks = document.querySelector("#rulerTicks");
+document.querySelector(".statusbar")?.remove();
+
+const emptyPlan = () => ({ kcal: 0, note: "这天还没有数据，请记录。", image: "", mealKcal: 0, time: "" });
+
+function startOfToday() {
+  const now = new Date();
+  return new Date(now.getFullYear(), now.getMonth(), now.getDate());
+}
+
+function dateKey(date) {
+  return [
+    date.getFullYear(),
+    String(date.getMonth() + 1).padStart(2, "0"),
+    String(date.getDate()).padStart(2, "0"),
+  ].join("-");
+}
+
+function timeLabel(date = new Date()) {
+  return `${String(date.getHours()).padStart(2, "0")}:${String(date.getMinutes()).padStart(2, "0")}`;
+}
+
+let currentDate = dateKey(startOfToday());
+let currentImage = "";
+let pendingKcal = 0;
+let pendingFoodLabel = "食物主体";
+let selectedWater = 100;
+let waterMl = 0;
+let waterLogs = [];
+let selectedWaterTime = { date: "今天", hour: new Date().getHours(), minute: new Date().getMinutes() };
+let waterPeriod = "week";
+
+const profile = {
+  heightCm: 171,
   weightKg: 83.7,
   activity: "high",
   weights: [84.2, 84.0, 84.1, 83.9, 83.8, 83.6, 83.7],
