@@ -16,6 +16,7 @@ const thumbKcal = document.querySelector("#thumbKcal");
 const sheetKcal = document.querySelector("#sheetKcal");
 const kcalProgress = document.querySelector("#kcalProgress");
 const logText = document.querySelector("#logText");
+const logTime = document.querySelector("#logTime") || document.querySelector(".day-log small");
 const activityButtons = document.querySelectorAll(".activity-tabs button");
 const weightValue = document.querySelector("#weightValue");
 const bmiValue = document.querySelector("#bmiValue");
@@ -52,19 +53,35 @@ const morningBar = document.querySelector("#morningBar");
 const afternoonBar = document.querySelector("#afternoonBar");
 const eveningBar = document.querySelector("#eveningBar");
 const rulerTicks = document.querySelector("#rulerTicks");
+document.querySelector(".statusbar")?.remove();
 
-let currentDate = "2026-06-29";
+const emptyPlan = () => ({ kcal: 0, note: "这天还没有数据，请记录。", image: "", mealKcal: 0, time: "" });
+
+function startOfToday() {
+  const now = new Date();
+  return new Date(now.getFullYear(), now.getMonth(), now.getDate());
+}
+
+function dateKey(date) {
+  return [
+    date.getFullYear(),
+    String(date.getMonth() + 1).padStart(2, "0"),
+    String(date.getDate()).padStart(2, "0"),
+  ].join("-");
+}
+
+function timeLabel(date = new Date()) {
+  return `${String(date.getHours()).padStart(2, "0")}:${String(date.getMinutes()).padStart(2, "0")}`;
+}
+
+let currentDate = dateKey(startOfToday());
 let currentImage = "";
-let pendingKcal = 175;
+let pendingKcal = 0;
+let pendingFoodLabel = "食物主体";
 let selectedWater = 100;
-let waterMl = 900;
-let waterLogs = [
-  { amount: 250, date: "今天", hour: 8, minute: 20 },
-  { amount: 250, date: "今天", hour: 11, minute: 10 },
-  { amount: 300, date: "今天", hour: 14, minute: 40 },
-  { amount: 100, date: "今天", hour: 15, minute: 36 },
-];
-let selectedWaterTime = { date: "今天", hour: 15, minute: 36 };
+let waterMl = 0;
+let waterLogs = [];
+let selectedWaterTime = { date: "今天", hour: new Date().getHours(), minute: new Date().getMinutes() };
 let waterPeriod = "week";
 
 const profile = {
@@ -75,44 +92,35 @@ const profile = {
 };
 
 const activityLevels = {
-  sedentary: { label: "久坐", factor: 26 },
-  light: { label: "轻活动", factor: 28 },
-  moderate: { label: "中等活动", factor: 30 },
-  high: { label: "高活动", factor: 32 },
+  sedentary: { label: "久坐", multiplier: 1.22, deficit: 0.78 },
+  light: { label: "轻活动", multiplier: 1.38, deficit: 0.80 },
+  moderate: { label: "中等活动", multiplier: 1.55, deficit: 0.82 },
+  high: { label: "高活动", multiplier: 1.72, deficit: 0.84 },
 };
 
-const dayPlans = {
-  "2026-06-25": { kcal: 420, note: "早餐燕麦<br>午餐清淡<br>晚上少油", image: "", mealKcal: 220 },
-  "2026-06-26": { kcal: 960, note: "外食日<br>记录了两餐<br>晚饭减量", image: "", mealKcal: 360 },
-  "2026-06-27": { kcal: 1280, note: "周末正常吃<br>多走路<br>注意喝水", image: "", mealKcal: 510 },
-  "2026-06-28": { kcal: 680, note: "轻食一天<br>水果加酸奶<br>晚餐待记录", image: "", mealKcal: 180 },
-  "2026-06-29": { kcal: 175, note: "吊龙烤肉肩<br>测试用<br>吊龙猪肉铺", image: "", mealKcal: 175 },
-  "2026-06-30": { kcal: 0, note: "这天还没有数据，请记录。", image: "", mealKcal: 0 },
-  "2026-07-01": { kcal: 0, note: "这天还没有数据，请记录。", image: "", mealKcal: 0 },
-  "2026-07-02": { kcal: 0, note: "这天还没有数据，请记录。", image: "", mealKcal: 0 },
-  "2026-07-03": { kcal: 0, note: "这天还没有数据，请记录。", image: "", mealKcal: 0 },
-  "2026-07-04": { kcal: 0, note: "这天还没有数据，请记录。", image: "", mealKcal: 0 },
-};
+const dayPlans = {};
 
 function planForDate(date) {
   if (!dayPlans[date]) {
-    dayPlans[date] = { kcal: 0, note: "这天还没有数据，请记录。", image: "", mealKcal: 0 };
+    dayPlans[date] = emptyPlan();
   }
   return dayPlans[date];
 }
 
 const foodWords = [
-  ["salad", 180],
-  ["rice", 360],
-  ["noodle", 520],
-  ["cake", 430],
-  ["pizza", 620],
-  ["burger", 680],
-  ["apple", 95],
-  ["banana", 120],
-  ["chicken", 460],
-  ["fish", 310],
-  ["pork", 175],
+  ["salad", "沙拉", 180],
+  ["rice", "米饭/盖饭", 360],
+  ["noodle", "面食", 520],
+  ["cake", "甜点", 430],
+  ["pizza", "披萨", 620],
+  ["burger", "汉堡", 680],
+  ["apple", "苹果", 95],
+  ["banana", "香蕉", 120],
+  ["chicken", "鸡肉餐", 460],
+  ["fish", "鱼类餐", 310],
+  ["pork", "猪肉餐", 420],
+  ["beef", "牛肉餐", 480],
+  ["meat", "肉类餐", 520],
 ];
 
 const waterHistory = {
@@ -127,7 +135,10 @@ function showPage(name) {
 }
 
 function recommendedKcal(activity = profile.activity) {
-  return Math.round(profile.weightKg * activityLevels[activity].factor);
+  const level = activityLevels[activity];
+  const bmr = 10 * profile.weightKg + 6.25 * profile.heightCm - 5 * 30 - 161;
+  const target = bmr * level.multiplier * level.deficit;
+  return Math.round(target / 10) * 10;
 }
 
 function updateActivityTargets() {
@@ -154,7 +165,7 @@ function updateWeightInfo() {
 function updateCalories() {
   const plan = planForDate(currentDate);
   todayKcal.textContent = plan.kcal;
-  thumbKcal.textContent = plan.mealKcal || pendingKcal;
+  thumbKcal.textContent = plan.mealKcal || 0;
   sheetKcal.textContent = pendingKcal;
   kcalProgress.style.width = `${Math.min(100, Math.round((plan.kcal / recommendedKcal()) * 100))}%`;
 }
@@ -162,14 +173,17 @@ function updateCalories() {
 function renderDay() {
   const plan = planForDate(currentDate);
   logText.innerHTML = plan.note;
+  logTime.textContent = plan.time || "";
   updateCalories();
 
   if (plan.image) {
     foodPreview.src = plan.image;
     foodPreview.style.display = "block";
+    foodPreview.closest(".log-thumb").hidden = false;
   } else {
     foodPreview.removeAttribute("src");
     foodPreview.style.display = "none";
+    foodPreview.closest(".log-thumb").hidden = true;
   }
 }
 
@@ -188,16 +202,12 @@ function selectDate(date, scroll = true) {
 
 function buildDateStrip() {
   const weekDays = ["周日", "周一", "周二", "周三", "周四", "周五", "周六"];
-  const base = new Date(2026, 5, 29);
+  const base = startOfToday();
   dateStrip.innerHTML = "";
-  for (let offset = -15; offset <= 15; offset += 1) {
+  for (let offset = -30; offset <= 30; offset += 1) {
     const date = new Date(base);
     date.setDate(base.getDate() + offset);
-    const key = [
-      date.getFullYear(),
-      String(date.getMonth() + 1).padStart(2, "0"),
-      String(date.getDate()).padStart(2, "0"),
-    ].join("-");
+    const key = dateKey(date);
     const button = document.createElement("button");
     button.className = "date-pill";
     button.type = "button";
@@ -212,9 +222,34 @@ function buildDateStrip() {
 function estimateFromFile(file) {
   const name = file.name.toLowerCase();
   const hit = foodWords.find(([key]) => name.includes(key));
-  if (hit) return hit[1];
+  if (hit) {
+    pendingFoodLabel = hit[1];
+    return hit[2];
+  }
+  pendingFoodLabel = "拍摄食物";
   const sizeSignal = Math.min(360, Math.round(file.size / 5200));
   return Math.max(95, 160 + sizeSignal + Math.round(Math.random() * 90));
+}
+
+function estimateFromImage(file) {
+  return new Promise((resolve) => {
+    const fallback = estimateFromFile(file);
+    const image = new Image();
+    const objectUrl = URL.createObjectURL(file);
+    image.onload = () => {
+      const megapixels = (image.naturalWidth * image.naturalHeight) / 1000000;
+      const densitySignal = Math.min(240, Math.round(file.size / Math.max(9000, megapixels * 9000)));
+      const plateSignal = Math.min(180, Math.round(Math.sqrt(megapixels) * 55));
+      const estimate = Math.round((fallback + densitySignal + plateSignal) / 10) * 10;
+      URL.revokeObjectURL(objectUrl);
+      resolve(Math.max(80, Math.min(980, estimate)));
+    };
+    image.onerror = () => {
+      URL.revokeObjectURL(objectUrl);
+      resolve(fallback);
+    };
+    image.src = objectUrl;
+  });
 }
 
 function updateFoodImage(url) {
@@ -362,7 +397,7 @@ function selectedWheelValue(column) {
 
 function waterDateOptions() {
   const result = [];
-  const base = new Date(2026, 5, 29);
+  const base = startOfToday();
   for (let offset = 0; offset < 30; offset += 1) {
     const date = new Date(base);
     date.setDate(base.getDate() - offset);
@@ -426,24 +461,29 @@ cameraButtons.forEach((button) => {
   button.addEventListener("click", () => foodInput.click());
 });
 
-foodInput.addEventListener("change", (event) => {
+foodInput.addEventListener("change", async (event) => {
   const [file] = event.target.files;
   if (!file) return;
-  pendingKcal = estimateFromFile(file);
-  updateFoodImage(URL.createObjectURL(file));
+  const previewUrl = URL.createObjectURL(file);
+  updateFoodImage(previewUrl);
+  pendingKcal = await estimateFromImage(file);
   updateCalories();
+  noteText.value = `${pendingFoodLabel}，自动估算约 ${pendingKcal} kcal`;
   openCaptureSheet();
+  foodInput.value = "";
 });
 
 closeSheet.addEventListener("click", closeCaptureSheet);
 
 confirmFood.addEventListener("click", () => {
   const plan = planForDate(currentDate);
-  const note = noteText.value.trim() || "测试用";
+  const nowLabel = timeLabel();
+  const note = noteText.value.trim() || `自动估算约 ${pendingKcal} kcal`;
   plan.kcal += pendingKcal;
   plan.mealKcal = pendingKcal;
   plan.image = currentImage;
-  plan.note = `吊龙烤肉肩<br>${note}<br>自动识别食物主体`;
+  plan.time = nowLabel;
+  plan.note = `${pendingFoodLabel}<br>${note}<br>拍照识别，仅供估算`;
   renderDay();
   closeCaptureSheet();
   showPage("today");
