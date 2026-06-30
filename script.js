@@ -124,9 +124,9 @@ const foodWords = [
 ];
 
 const waterHistory = {
-  week: { days: 7, total: 6320, count: 28 },
-  month: { days: 30, total: 27400, count: 126 },
-  year: { days: 365, total: 318000, count: 1420 },
+  week: { days: 7, total: 0, count: 0 },
+  month: { days: 30, total: 0, count: 0 },
+  year: { days: 365, total: 0, count: 0 },
 };
 
 function showPage(name) {
@@ -273,8 +273,8 @@ function updateWater() {
   const percent = Math.max(0, Math.min(100, Math.round((waterMl / 2000) * 100)));
   waterFill.style.height = `${Math.max(12, percent)}%`;
   document.documentElement.style.setProperty("--water-marker", `${100 - percent}%`);
-  document.documentElement.style.setProperty("--water-marker-top", percent >= 100 ? "15px" : `${100 - percent}%`);
-  document.documentElement.style.setProperty("--water-marker-shift", percent >= 100 ? "0" : "-50%");
+  document.documentElement.style.setProperty("--water-marker-top", percent >= 100 ? "15px" : percent <= 0 ? "calc(100% + 12px)" : `${100 - percent}%`);
+  document.documentElement.style.setProperty("--water-marker-shift", percent >= 100 || percent <= 0 ? "0" : "-50%");
   document.documentElement.style.setProperty("--water-surface", `${326 - (percent / 100) * 210}px`);
   waterNow.textContent = `${waterMl}ml`;
   updateRulerTicks(percent);
@@ -313,9 +313,9 @@ function waterHint(amount) {
   if (amount <= 50) return "约两口水";
   if (amount <= 100) return "约1个纸杯";
   if (amount <= 250) return "约半瓶矿泉水";
-  if (amount <= 500) return "一瓶矿泉水";
-  if (amount <= 800) return "两听可乐";
-  return "两瓶矿泉水";
+  if (amount <= 500) return "约一瓶矿泉水";
+  if (amount <= 800) return "约两听可乐";
+  return "约两瓶矿泉水";
 }
 
 function selectWaterAmount(button, scroll = true) {
